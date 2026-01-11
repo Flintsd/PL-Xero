@@ -4,7 +4,7 @@ module.exports = {
       name: "xero-bridge",
       script: "xero-bridge.js",
       env: {
-        PORT: 4002
+        PORT: process.env.PORT || 4002
       }
     }
   ]

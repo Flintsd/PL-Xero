@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+blocked_files=$(git diff --cached --name-only --diff-filter=ACMR | \
+  grep -E -i '(^|/)(xero-token\.json|[^/]+\.log|\.env(\..*)?)$|(^|/)node_modules(/|$)' || true)
+
+# Allow .env.example to be committed.
+blocked_files=$(printf "%s\n" "$blocked_files" | grep -v -E '(^|/)\.env\.example$' || true)
+
+if [[ -n "$blocked_files" ]]; then
+  echo "ERROR: Attempting to commit forbidden files:" >&2
+  echo "$blocked_files" >&2
+  echo "Remove them from the commit before continuing." >&2
+  exit 1
+fi
