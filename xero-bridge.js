@@ -21,7 +21,7 @@ const fs = require("fs");
 const path = require("path");
 const axios = require("axios");
 
-const { PORT, LOG_LEVEL, PL_API_URL, PL_API_KEY } = require("./config");
+const { PORT, LOG_LEVEL, PL_API_URL, PL_API_KEY, TOKEN_PATH } = require("./config");
 
 // From xeroClient we just need the client + init helper
 const { xero, initXeroFromDisk } = require("./xeroClient");
@@ -32,7 +32,7 @@ const { createInvoiceFromPlPayload } = require("./invoiceService");
 const app = express();
 
 // Where we persist the Xero token set
-const TOKEN_PATH = path.join(__dirname, "xero-token.json");
+// (centralised in config.js as TOKEN_PATH)
 
 // -----------------------------------------------------------------------------
 // Helpers

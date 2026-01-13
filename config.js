@@ -19,7 +19,7 @@ module.exports = {
     "offline_access accounting.transactions accounting.contacts accounting.settings",
 
   // Where we store the Xero token JSON
-  TOKEN_PATH: path.join(__dirname, "xero-token.json"),
+  TOKEN_PATH: "/var/lib/pl-xero/xero-token.json",
 
   // Accounting config
   XERO_SALES_ACCOUNT: process.env.XERO_SALES_ACCOUNT || "200",

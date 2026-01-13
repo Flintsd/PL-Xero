@@ -6,7 +6,7 @@ const path = require("path");
 const axios = require("axios");
 const { XeroClient } = require("xero-node");
 
-const TOKEN_PATH = path.join(__dirname, "xero-token.json");
+const { TOKEN_PATH } = require("./config");
 
 const xero = new XeroClient({
   clientId: process.env.XERO_CLIENT_ID,
