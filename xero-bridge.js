@@ -246,9 +246,82 @@ app.post("/create-invoice", async (req, res) => {
     // The heavy lifting is done in invoiceService
     const result = await createInvoiceFromPlPayload(payload);
 
+    const payloadOrderNumber = payload?.order_number;
+    const plOrderNumber =
+      payloadOrderNumber !== undefined &&
+      payloadOrderNumber !== null &&
+      payloadOrderNumber !== ""
+        ? String(payloadOrderNumber)
+        : extractOrderNumberFromReference(
+            result.reference || result.invoice?.reference
+          );
+
+    if (!plOrderNumber) {
+      console.log(
+        "[PL] after-create: no order_number available; skipping PL writeback"
+      );
+    } else {
+      const afterCreateStatus =
+        process.env.PL_AFTER_CREATE_STATUS || "Pre-Press";
+      const statusNonBlocking = ["1", "true", "yes"].includes(
+        (process.env.PL_AFTER_CREATE_STATUS_NONBLOCKING || "").toLowerCase()
+      );
+
+      const updateStatus = async () => {
+        await updatePrintlogicOrderStatus(plOrderNumber, afterCreateStatus);
+        console.log(
+          `[PL] after-create status update: order ${plOrderNumber} -> "${afterCreateStatus}"`
+        );
+      };
+
+      if (statusNonBlocking) {
+        try {
+          await updateStatus();
+        } catch (err) {
+          console.warn(
+            "[PL] after-create status update failed:",
+            err.response?.data || err.response?.body || err.message
+          );
+        }
+      } else {
+        try {
+          await updateStatus();
+        } catch (err) {
+          console.warn(
+            "[PL] after-create status update failed:",
+            err.response?.data || err.response?.body || err.message
+          );
+          throw err;
+        }
+      }
+
+      const invoiceRefAction = (process.env.PL_INVOICE_REF_ACTION || "").trim();
+      if (invoiceRefAction) {
+        try {
+          const refResult = await updatePrintlogicOrderInvoiceRef(
+            plOrderNumber,
+            result.invoiceNumber,
+            result.invoiceId
+          );
+          if (refResult) {
+            console.log(
+              `[PL] after-create invoice ref updated: order ${plOrderNumber}, invoice ${result.invoiceNumber}`
+            );
+          }
+        } catch (err) {
+          console.warn(
+            "[PL] after-create invoice ref update failed:",
+            err.response?.data || err.response?.body || err.message
+          );
+        }
+      }
+    }
+
     return res.status(201).json({
-      ok: true,
+    ok: true,
       invoiceId: result.invoiceId,
+      invoiceNumber: result.invoiceNumber,
+      reference: result.reference,
     });
   } catch (err) {
     const status = err?.status || 500;

@@ -3,6 +3,13 @@
 // Central config wrapper around process.env
 // -----------------------------------------------------------------------------
 
+// Load environment from /etc/pl-xero/pl-xero.env (server-managed config)
+try {
+  require("dotenv").config({ path: "/etc/pl-xero/pl-xero.env" });
+} catch (e) {
+  // If dotenv isn't installed yet, config will still work with PM2-provided env.
+}
+
 const path = require("path");
 
 module.exports = {

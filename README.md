@@ -34,6 +34,29 @@ node xero-bridge.js
 
 To authenticate Xero, visit GET /xero/auth-url and complete the OAuth flow (Xero will redirect to /xero/callback).
 
+## Manual test (create invoice)
+Example payload with an `order_number` so PL writeback can run:
+
+```bash
+curl -s -X POST http://localhost:4002/create-invoice \
+  -H "Content-Type: application/json" \
+  -d '{
+    "order_number": "6789",
+    "order_po": "WEB-1234",
+    "pl_order": {
+      "customer_name": "Test Customer",
+      "customer_email": "test@example.com"
+    },
+    "lineItems": [
+      { "description": "Test item", "quantity": 1, "unitAmount": 10.0 }
+    ]
+  }'
+```
+
+Check logs for the PL writeback lines (writeback happens on create, not paid):
+- `[PL] after-create status update: order 6789 -> "Pre-Press"`
+- `[PL] after-create invoice ref updated: order 6789, invoice INV-...` (when `PL_INVOICE_REF_ACTION` is set)
+
 ## Server (PM2)
 npm ci
 pm2 start ecosystem.config.js

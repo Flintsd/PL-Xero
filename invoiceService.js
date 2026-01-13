@@ -449,8 +449,19 @@ async function createInvoiceFromPlPayload(plPayload) {
   // Email customer, if requested
   await maybeEmailInvoice(xero, xeroTenantId, context, createdInvoice);
 
+  const invoiceId = createdInvoice.invoiceID || createdInvoice.InvoiceID;
+  const invoiceNumber =
+    createdInvoice.invoiceNumber || createdInvoice.InvoiceNumber || null;
+  const reference =
+    createdInvoice.reference ||
+    createdInvoice.Reference ||
+    invoice.reference ||
+    null;
+
   return {
-    invoiceId: createdInvoice.invoiceID,
+    invoiceId,
+    invoiceNumber,
+    reference,
     invoice: createdInvoice,
     rawResponse: result.body || null,
   };
