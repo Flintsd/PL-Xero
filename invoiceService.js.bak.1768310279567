@@ -83,94 +83,43 @@ function deriveContext(payload) {
   let customerCategory = pl_order.customer_category || "";
   let brandTrackingOption = undefined;
 
-  const normalizeKey = (value) => String(value || "").trim().toLowerCase();
-  const templateRaw = template || "";
-  const customerCategoryRaw = customerCategory || "";
-  const templateValue = String(templateRaw).trim();
-  const categoryValue = String(customerCategoryRaw).trim();
-  const templateKey = normalizeKey(templateRaw);
-  const categoryKey = normalizeKey(customerCategoryRaw);
-  const tplRaw = templateValue || categoryValue || "";
-  const tpl = tplRaw;
+ const tplRaw = template || customerCategory || "";
+const tpl = String(tplRaw).trim();
+const tplKey = tpl.toLowerCase();
 
-  const BRANDING_BY_TPL = {
-    // Edinburgh
-    "edinburgh_banners": process.env.XERO_BRAND_EDINBURGH,
-    "edinburgh banners": process.env.XERO_BRAND_EDINBURGH,
+const BRANDING_BY_TPL = {
+  // Edinburgh
+  "edinburgh_banners": process.env.XERO_BRAND_EDINBURGH,
+  "edinburgh banners": process.env.XERO_BRAND_EDINBURGH,
 
-    // SDK
-    "sdk": process.env.XERO_BRAND_SDK,
-    "sdk_group": process.env.XERO_BRAND_SDK,
-    "sdk group": process.env.XERO_BRAND_SDK,
+  // SDK
+  "sdk": process.env.XERO_BRAND_SDK,
+  "sdk_group": process.env.XERO_BRAND_SDK,
+  "sdk group": process.env.XERO_BRAND_SDK,
 
-    // Giclee
-    "giclee": process.env.XERO_BRAND_GICLEE,
-    "giclée": process.env.XERO_BRAND_GICLEE,
+  // Giclee
+  "giclee": process.env.XERO_BRAND_GICLEE,
+  "giclée": process.env.XERO_BRAND_GICLEE,
 
-    // PPS
-    "pps": process.env.XERO_BRAND_PPS,
-    "pro print": process.env.XERO_BRAND_PPS,
-    "pro print studio": process.env.XERO_BRAND_PPS,
-  };
+  // PPS
+  "pps": process.env.XERO_BRAND_PPS,
+};
 
-  const TRACKING_BY_TPL = {
-    "edinburgh_banners": {
-      customerCategory: "Edinburgh_Banners",
-      brandTrackingOption: "Edinburgh Banners",
-    },
-    "edinburgh banners": {
-      customerCategory: "Edinburgh_Banners",
-      brandTrackingOption: "Edinburgh Banners",
-    },
-    "giclee": {
-      customerCategory: "Giclee",
-      brandTrackingOption: "Giclee",
-    },
-    "giclée": {
-      customerCategory: "Giclee",
-      brandTrackingOption: "Giclee",
-    },
-    "sdk": {
-      customerCategory: "SDK_Group",
-      brandTrackingOption: "SDK Group",
-    },
-    "sdk_group": {
-      customerCategory: "SDK_Group",
-      brandTrackingOption: "SDK Group",
-    },
-    "sdk group": {
-      customerCategory: "SDK_Group",
-      brandTrackingOption: "SDK Group",
-    },
-    "pps": {
-      customerCategory: "Pro Print Studio",
-      brandTrackingOption: "Pro Print Studio",
-    },
-    "pro print": {
-      customerCategory: "Pro Print Studio",
-      brandTrackingOption: "Pro Print Studio",
-    },
-    "pro print studio": {
-      customerCategory: "Pro Print Studio",
-      brandTrackingOption: "Pro Print Studio",
-    },
-  };
+brandingThemeId = BRANDING_BY_TPL[tplKey] || undefined;
 
-  brandingThemeId =
-    BRANDING_BY_TPL[templateKey] || BRANDING_BY_TPL[categoryKey] || undefined;
+// tracking/category defaults
+customerCategory = customerCategory || tpl || "Default";
+brandTrackingOption = tpl || "Default";
 
-  // tracking/category defaults
-  customerCategory = categoryValue || tpl || "Default";
-  brandTrackingOption = tpl || "Default";
+// Optional: force “nice” tracking labels
+if (tplKey === "edinburgh_banners" || tplKey === "edinburgh banners") {
+  customerCategory = "Edinburgh_Banners";
+  brandTrackingOption = "Edinburgh Banners";
+} else if (tplKey === "giclee" || tplKey === "giclée") {
+  customerCategory = "Giclee";
+  brandTrackingOption = "Giclee";
+}
 
-  // Optional: force “nice” tracking labels
-  const trackingOverride =
-    TRACKING_BY_TPL[templateKey] || TRACKING_BY_TPL[categoryKey];
-  if (trackingOverride) {
-    customerCategory = trackingOverride.customerCategory || customerCategory;
-    brandTrackingOption =
-      trackingOverride.brandTrackingOption || brandTrackingOption;
-  }
 
   const markAsPaidFlag = toBool(markAsPaid);
   const emailCustomerFlag = toBool(emailCustomer);
