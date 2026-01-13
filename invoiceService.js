@@ -3,6 +3,58 @@
 const { xero, ensureXeroReady } = require("./xeroClient");
 const { buildLineItems } = require("./invoiceHelpers");
 
+class AppError extends Error {
+  constructor(message, { status = 500, code = "INTERNAL_ERROR", details } = {}) {
+    super(message);
+    this.name = "AppError";
+    this.status = status;
+    this.code = code;
+    if (details !== undefined) {
+      this.details = details;
+    }
+  }
+}
+
+function isNonEmptyObject(value) {
+  return (
+    value &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    Object.keys(value).length > 0
+  );
+}
+
+function validatePayload(plPayload) {
+  const isObject =
+    plPayload && typeof plPayload === "object" && !Array.isArray(plPayload);
+
+  if (!isObject) {
+    throw new AppError("Invalid payload: expected object", {
+      status: 400,
+      code: "BAD_REQUEST",
+    });
+  }
+
+  if (Object.keys(plPayload).length === 0) {
+    throw new AppError("Invalid payload: empty object", {
+      status: 400,
+      code: "BAD_REQUEST",
+    });
+  }
+
+  const orderItems = plPayload?.order_detail?.items;
+  const lineItems = plPayload?.lineItems;
+  const hasOrderItems = isNonEmptyObject(orderItems);
+  const hasLineItems = Array.isArray(lineItems) && lineItems.length > 0;
+
+  if (!hasOrderItems && !hasLineItems) {
+    throw new AppError("Invalid payload: missing invoice lines", {
+      status: 400,
+      code: "BAD_REQUEST",
+    });
+  }
+}
+
 function toBool(val) {
   if (typeof val === "boolean") return val;
   if (val == null) return false;
@@ -274,6 +326,8 @@ async function createInvoiceFromPlPayload(plPayload) {
     JSON.stringify(plPayload, null, 2)
   );
 
+  validatePayload(plPayload);
+
   const context = deriveContext(plPayload);
 
   const invoice = buildInvoiceModel(plPayload, context);
@@ -287,52 +341,122 @@ async function createInvoiceFromPlPayload(plPayload) {
   console.log("[invoiceService] Calling createInvoices with payload:");
   console.log(JSON.stringify(invoicesWrapper, null, 2));
 
+  let result;
   try {
     const summarizeErrors = true;
     const unitdp = 2;
 
-    const result = await xero.accountingApi.createInvoices(
+    result = await xero.accountingApi.createInvoices(
       xeroTenantId,
       invoicesWrapper,
       summarizeErrors,
       unitdp
     );
-
-    const createdInvoice =
-      result?.body?.invoices && result.body.invoices.length
-        ? result.body.invoices[0]
-        : null;
-
-    console.log(
-      "[invoiceService] createInvoices response:",
-      JSON.stringify(result.body || result.response?.statusCode, null, 2)
-    );
-
-    // Mark as paid, if requested
-    await maybeMarkAsPaid(xero, xeroTenantId, plPayload, context, createdInvoice);
-
-    // Email customer, if requested
-    await maybeEmailInvoice(xero, xeroTenantId, context, createdInvoice);
-
-    return {
-      success: true,
-      invoice: createdInvoice,
-      rawResponse: result.body || null,
-    };
   } catch (err) {
-    const errorJson = err?.response?.body
-      ? JSON.stringify(err.response.body, null, 2)
-      : err.message;
+    const unwrap = (v) =>
+      v && typeof v === "object"
+        ? v.error ?? v.innerError ?? v.cause ?? v
+        : v;
+    const raw = unwrap(err);
+    let eObj = raw;
+    if (typeof raw === "string") {
+      try {
+        eObj = JSON.parse(raw);
+      } catch {
+        eObj = { message: raw };
+      }
+    } else if (raw == null) {
+      eObj = { message: "Unknown error from Xero client" };
+    }
 
-    console.error("[/create-invoice] Error in invoiceService:", errorJson);
+    const status =
+      eObj?.response?.statusCode ??
+      eObj?.response?.status ??
+      eObj?.status ??
+      eObj?.statusCode ??
+      eObj?.StatusCode ??
+      null;
 
-    return {
-      success: false,
-      error: errorJson,
-    };
+    const body =
+      eObj?.response?.body ??
+      eObj?.response?.data ??
+      eObj?.body ??
+      eObj?.data ??
+      eObj?.error ??
+      eObj?.Error ??
+      null;
+
+    const details =
+      body ?? {
+        thrownType: typeof raw,
+        status,
+        message: eObj?.message ?? null,
+        keys: eObj && typeof eObj === "object" ? Object.keys(eObj) : null,
+        rawPrefix: typeof raw === "string" ? raw.slice(0, 400) : null,
+      };
+
+    console.error("[invoiceService] createInvoices threw:", {
+      thrownType: typeof raw,
+      status,
+      message: eObj?.message ?? null,
+      rawPrefix: typeof raw === "string" ? raw.slice(0, 200) : null,
+    });
+
+    if (status === 400) {
+      throw new AppError("Xero validation error", {
+        status: 400,
+        code: "XERO_VALIDATION",
+        details,
+      });
+    }
+
+    if (status === 401 || status === 403) {
+      throw new AppError("Xero auth error", {
+        status: 502,
+        code: "XERO_AUTH",
+        details,
+      });
+    }
+
+    throw new AppError("Xero upstream error", {
+      status: 502,
+      code: "XERO_UPSTREAM",
+      details,
+    });
   }
+
+  const createdInvoice =
+    result?.body?.invoices && result.body.invoices.length
+      ? result.body.invoices[0]
+      : null;
+
+  console.log(
+    "[invoiceService] createInvoices response:",
+    JSON.stringify(result.body || result.response?.statusCode, null, 2)
+  );
+
+  if (!createdInvoice?.invoiceID) {
+    throw new AppError("Xero response missing invoiceID", {
+      status: 502,
+      code: "XERO_BAD_RESPONSE",
+      details: result.body || null,
+    });
+  }
+
+  // Mark as paid, if requested
+  await maybeMarkAsPaid(xero, xeroTenantId, plPayload, context, createdInvoice);
+
+  // Email customer, if requested
+  await maybeEmailInvoice(xero, xeroTenantId, context, createdInvoice);
+
+  return {
+    invoiceId: createdInvoice.invoiceID,
+    invoice: createdInvoice,
+    rawResponse: result.body || null,
+  };
 }
 
 module.exports = {
+  AppError,
   createInvoiceFromPlPayload,
 };

@@ -184,7 +184,7 @@ app.post("/create-invoice", async (req, res) => {
     // Optional escape hatch: allow logicConfig to set _skipXero
     if (payload._skipXero) {
       console.log("[/create-invoice] _skipXero flag set, not calling Xero.");
-      return res.json({
+      return res.status(200).json({
         ok: true,
         skipped: true,
         reason: "_skipXero flag set by server-side logic",
@@ -194,22 +194,34 @@ app.post("/create-invoice", async (req, res) => {
     // The heavy lifting is done in invoiceService
     const result = await createInvoiceFromPlPayload(payload);
 
-    return res.json({
+    return res.status(201).json({
       ok: true,
-      result,
+      invoiceId: result.invoiceId,
     });
   } catch (err) {
-    console.error("[/create-invoice] Error:", err);
+    const status = err?.status || 500;
+    const code = err?.code || "INTERNAL_ERROR";
+    const message = err?.message || "Error creating invoice";
+    const details = err?.details;
 
-    // Try to surface useful details from Xero if present
-    const status = err.response?.status || 500;
-    const data = err.response?.data || err.response?.body;
-
-    return res.status(status).json({
-      ok: false,
-      error: err.message || "Error creating invoice",
-      xero: data || null,
+    console.error("[/create-invoice] Error:", {
+      status,
+      code,
+      message,
+      details,
     });
+
+    const response = {
+      ok: false,
+      code,
+      error: message,
+    };
+
+    if (details !== undefined) {
+      response.details = details;
+    }
+
+    return res.status(status).json(response);
   }
 });
 
