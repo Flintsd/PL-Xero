@@ -102,12 +102,42 @@ function getBrandTrackingOption({ categoryRaw, isWeb }) {
 // Also: we DO NOT skip quantity=0 items (could be free shipping/services).
 
 function buildLineItems(plPayload, brandTrackingOption) {
+  const defaultTaxType = (process.env.XERO_DEFAULT_TAX_TYPE || "").trim();
+  const applyDefaultTaxType = (items) => {
+    if (!defaultTaxType || !Array.isArray(items)) return items;
+    let appliedCount = 0;
+    items.forEach((li) => {
+      if (!li || typeof li !== "object") return;
+      const taxTypeValue =
+        li.taxType != null && String(li.taxType).trim() !== ""
+          ? li.taxType
+          : null;
+      const taxTypeAltValue =
+        li.TaxType != null && String(li.TaxType).trim() !== ""
+          ? li.TaxType
+          : null;
+      if (!taxTypeValue && !taxTypeAltValue) {
+        li.taxType = defaultTaxType;
+        appliedCount += 1;
+      }
+    });
+    if (appliedCount > 0) {
+      console.log(
+        "[invoiceHelpers] Applied default taxType to",
+        appliedCount,
+        "line items:",
+        defaultTaxType
+      );
+    }
+    return items;
+  };
+
   const order_detail = plPayload?.order_detail;
 
   // If explicit lineItems were provided in the payload (future-proofing), trust them.
   if (Array.isArray(plPayload?.lineItems) && plPayload.lineItems.length > 0) {
     console.log("[invoiceHelpers.buildLineItems] Using lineItems from request.");
-    return plPayload.lineItems;
+    return applyDefaultTaxType(plPayload.lineItems);
   }
 
   if (!order_detail?.items || typeof order_detail.items !== "object") {
@@ -167,7 +197,7 @@ function buildLineItems(plPayload, brandTrackingOption) {
     "[invoiceHelpers.buildLineItems] Built lineItems from order_detail.items (including qty=0 items):",
     xeroLineItems.length
   );
-  return xeroLineItems;
+  return applyDefaultTaxType(xeroLineItems);
 }
 
 // --------------------------- Legacy invoice payload builder ---------
