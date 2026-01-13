@@ -78,6 +78,58 @@ async function updatePrintlogicOrderStatus(orderNumber, status) {
 }
 
 /**
+ * Push Xero invoice reference back into PrintLogic.
+ * Expects PL to respond with { result: "ok" } or { status: "ok" } on success.
+ */
+async function updatePrintlogicOrderInvoiceRef(
+  orderNumber,
+  invoiceNumber,
+  invoiceId
+) {
+  const action = (process.env.PL_INVOICE_REF_ACTION || "").trim();
+  if (!action) {
+    return null;
+  }
+
+  if (!PL_API_URL || !PL_API_KEY) {
+    throw new Error("PL_API_URL or PL_API_KEY missing in environment");
+  }
+
+  const fieldNumber =
+    process.env.PL_INVOICE_REF_FIELD_NUMBER || "xero_invoice_number";
+  const fieldId = process.env.PL_INVOICE_REF_FIELD_ID || "xero_invoice_id";
+
+  const payload = {
+    action,
+    order_number: String(orderNumber),
+    [fieldNumber]: String(invoiceNumber),
+  };
+
+  if (invoiceId !== undefined && invoiceId !== null) {
+    payload[fieldId] = String(invoiceId);
+  }
+
+  console.log("[PL] invoice ref payload:", payload);
+
+  const resp = await axios.post(PL_API_URL, payload, {
+    params: { api_key: PL_API_KEY },
+    headers: { "Content-Type": "application/json" },
+    timeout: 10000,
+  });
+
+  const data = resp.data || {};
+  const result = data.result ?? data.status;
+
+  if (result !== "ok") {
+    throw new Error(
+      `PrintLogic ${action} failed: ${JSON.stringify(data)}`
+    );
+  }
+
+  return data;
+}
+
+/**
  * Extract PL order number from an invoice reference string.
  * Expected formats:
  *   "[6663]"
@@ -317,6 +369,23 @@ app.post("/xero/invoice-webhook", async (req, res) => {
 
       // Update the order in PrintLogic to Pre-Press
       await updatePrintlogicOrderStatus(plOrderNumber, "Pre-Press");
+      try {
+        const result = await updatePrintlogicOrderInvoiceRef(
+          plOrderNumber,
+          invoice.invoiceNumber,
+          invoice.invoiceID
+        );
+        if (result) {
+          console.log(
+            `[PL] invoice ref updated: order ${plOrderNumber}, invoice ${invoice.invoiceNumber}`
+          );
+        }
+      } catch (err) {
+        console.warn(
+          "[PL] invoice ref update failed:",
+          err.response?.data || err.response?.body || err.message
+        );
+      }
 
       console.log(
         `[/xero/invoice-webhook] Updated PL order ${plOrderNumber} → "Pre-Press" (Xero invoice ${invoice.invoiceNumber})`
