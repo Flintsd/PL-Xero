@@ -1,7 +1,6 @@
 // xeroClient.js
 // Centralised Xero client, with manual refresh + tenant handling
 
-require("dotenv").config();
 const fs = require("fs");
 const path = require("path");
 const axios = require("axios");

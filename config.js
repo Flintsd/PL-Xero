@@ -3,7 +3,6 @@
 // Central config wrapper around process.env
 // -----------------------------------------------------------------------------
 
-require("dotenv").config();
 const path = require("path");
 
 module.exports = {

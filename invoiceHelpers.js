@@ -13,7 +13,6 @@
 // Xero expects.
 // -----------------------------------------------------------------------------
 
-require("dotenv").config();
 
 // Optional config override
 let CONFIG = {};

@@ -12,7 +12,7 @@
 //   POST /xero/invoice-webhook → Xero → PL payment sync (when invoice is PAID)
 // -----------------------------------------------------------------------------
 
-require("dotenv").config({ path: "/etc/pl-xero/pl-xero.env" });
+require("dotenv").config({ path: "/etc/pl-xero/pl-xero.env", quiet: true });
 const express = require("express");
 const morgan = require("morgan");
 const cors = require("cors");
