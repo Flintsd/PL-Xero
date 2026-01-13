@@ -3,7 +3,7 @@
 Express service that accepts PrintLogic/Power Automate payloads, creates Xero invoices, and syncs paid invoices back to PrintLogic.
 
 ## Configuration
-All runtime settings are provided via environment variables (use `.env` for local dev).
+All runtime settings are provided via environment variables (use .env for local dev).
 
 Required variables:
 - XERO_CLIENT_ID
@@ -28,12 +28,9 @@ Common optional variables:
 See .env.example for a full template.
 
 ## Local development
-1) Copy env template:
-   cp .env.example .env
-2) Install deps:
-   npm install
-3) Run:
-   node xero-bridge.js
+cp .env.example .env
+npm install
+node xero-bridge.js
 
 To authenticate Xero, visit GET /xero/auth-url and complete the OAuth flow (Xero will redirect to /xero/callback).
 
